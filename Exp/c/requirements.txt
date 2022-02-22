@@ -1,2 +1,2 @@
-a-pkg-eric-lian==0.0.1
-b-pkg-eric-lian==0.0.1
+a-pkg-eric-lian
+b-pkg-eric-lian
