@@ -1,5 +1,6 @@
-from a_pkg import succ
-from b_pkg import prev
+from apkg.example import succ
+from bpkg.example import prev
+
 
 def add(lhs: int, rhs: int) -> int:
     if rhs < 0:
@@ -7,6 +8,7 @@ def add(lhs: int, rhs: int) -> int:
     if rhs == 0:
         return lhs
     return add(succ(lhs), rhs - 1)
+
 
 def sub(lhs: int, rhs: int) -> int:
     if rhs > 0:
