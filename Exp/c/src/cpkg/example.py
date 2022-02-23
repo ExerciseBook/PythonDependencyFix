@@ -1,4 +1,4 @@
-from apkg.example import succ
+from apkg.example import succ_v2
 from bpkg.example import prev
 
 
@@ -7,7 +7,7 @@ def add(lhs: int, rhs: int) -> int:
         raise ValueError()
     if rhs == 0:
         return lhs
-    return add(succ(lhs), rhs - 1)
+    return add(succ_v2(lhs), rhs - 1)
 
 
 def sub(lhs: int, rhs: int) -> int:

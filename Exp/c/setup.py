@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="c-pkg-eric-lian",
-    version="0.0.1",
+    version="0.0.2",
     author="Eric Lian",
     author_email="public@superexercisebook.com",
     description=long_description,
@@ -24,8 +24,8 @@ setuptools.setup(
     python_requires=">=3.6",
 
     install_requires=[
-        "a_pkg==0.0.1",
-        "b_pkg==0.0.1"
+        "a-pkg-eric-lian==0.0.2",
+        "b-pkg-eric-lian==0.0.1"
     ],
     dependency_links=[
         'https://pip.laptop.lhr.wiki/'
