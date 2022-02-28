@@ -4,7 +4,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="b-pkg-eric-lian",
+    name="bpkg",
     version="0.0.2",
     author="Eric Lian",
     author_email="public@superexercisebook.com",
