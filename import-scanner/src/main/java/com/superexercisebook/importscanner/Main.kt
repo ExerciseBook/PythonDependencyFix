@@ -22,6 +22,12 @@ fun main() {
         |    import G
         |else:
         |    import H
+        |
+        |import I
+        |from J import K, L, M, N
+        |
+        |import O.P.Q
+        |from R.S.T import U, V, W
     """.trimMargin())
     val lexer = PythonLexer(input)
     val tokens = CommonTokenStream(lexer)
