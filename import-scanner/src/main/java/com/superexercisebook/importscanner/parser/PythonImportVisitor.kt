@@ -13,7 +13,7 @@ open class PythonImportVisitor : PythonParserBaseVisitor<Unit>() {
             return
         }
 
-        println("${ctx.depth()}:${ctx.dotted_as_names().text}")
+        println("${ctx.depth()}:${ctx.dotted_as_names()?.text}")
 
         return visitChildren(ctx)
     }
@@ -27,7 +27,7 @@ open class PythonImportVisitor : PythonParserBaseVisitor<Unit>() {
             return
         }
 
-        println("${ctx.depth()}:${ctx.dotted_name().text}")
+        println("${ctx.depth()}:${ctx.dotted_name()?.text}")
 
         return visitChildren(ctx)
     }
