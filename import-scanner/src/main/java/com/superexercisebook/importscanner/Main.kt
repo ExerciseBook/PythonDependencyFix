@@ -9,60 +9,63 @@ import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.ParseTree
 import java.io.File
 
-class Main
-
-fun main(args: Array<String>) {
-    when (args.size) {
-        1 -> scanDirectory(args[0])
-        else -> test()
-    }
-}
-
-fun scanDirectory(s: String) = scanDirectory(File(s))
-
-fun scanDirectory(s: File) {
-    s.walk().forEach {
-        if (s == it) return@forEach
-
-        if (it.isFile && it.extension == "py") {
-            scanFile(it)
-        } else if (it.isDirectory) {
-            scanDirectory(it)
+object Main {
+    @JvmStatic
+    fun main(args: Array<String>) {
+        when (args.size) {
+            1 -> scanDirectory(args[0])
+            else -> test()
         }
     }
-}
 
-fun scanFile(file: File) {
-    println(file.toString())
-    val input = CharStreams.fromFileName(file.toString())
-    scanCharStream(input)
-}
+    fun scanDirectory(s: String) = scanDirectory(File(s), File(s))
 
-fun scanCharStream(stream: CharStream) {
-    val eval = PythonImportVisitor()
-    val lexer = PythonLexer(stream)
-    val tokens = CommonTokenStream(lexer)
-    val parser = PythonParser(tokens)
-    val tree: ParseTree = parser.file_input()
-    eval.visit(tree)
-}
+    fun scanDirectory(s: File, projectDirectory: File = File(".")) {
+        s.walk().forEach {
+            if (s == it) return@forEach
 
-fun test() {
-    val input: CharStream
-    input = CharStreams.fromString("""import A
-        |from B import C
-        |from D import E, F
-        |
-        |if 1 == 2:
-        |    import G
-        |else:
-        |    import H
-        |
-        |import I
-        |from J import K, L, M, N
-        |
-        |import O.P.Q
-        |from R.S.T import U, V, W
-    """.trimMargin())
-    scanCharStream(input)
+            if (it.isFile && it.extension == "py") {
+                scanFile(it, projectDirectory)
+            } else if (it.isDirectory) {
+                scanDirectory(it, projectDirectory)
+            }
+        }
+    }
+
+    fun scanFile(file: File, projectDirectory: File = File(".")) {
+        println(file.toString())
+        val input = CharStreams.fromFileName(file.toString())
+        scanCharStream(input, projectDirectory, file)
+    }
+
+    fun scanCharStream(stream: CharStream, projectDirectory: File = File("."), filePath: File = File("a.py")) {
+        val eval = PythonImportVisitor(projectDirectory, filePath)
+        val lexer = PythonLexer(stream)
+        val tokens = CommonTokenStream(lexer)
+        val parser = PythonParser(tokens)
+        val tree: ParseTree = parser.file_input()
+        eval.visit(tree)
+    }
+
+    fun test() {
+        val input: CharStream
+        input = CharStreams.fromString("""
+            |import A
+            |from B import C
+            |from D import E, F
+            |
+            |if 1 == 2:
+            |    import G
+            |else:
+            |    import H
+            |
+            |import I
+            |from J import K, L, M, N
+            |
+            |import O.P.Q
+            |from R.S.T import U, V, W
+            |
+        """.trimMargin())
+        scanCharStream(input)
+    }
 }
