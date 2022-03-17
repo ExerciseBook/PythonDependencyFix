@@ -5,9 +5,12 @@ import com.superexercisebook.importscanner.parser.PythonParser.Import_stmtContex
 import com.superexercisebook.importscanner.parser.PythonSystemPackage.systemPackage
 import java.io.File
 
-open class PythonImportVisitor(val projectDirectory: File, val filePath: File) : PythonParserBaseVisitor<Unit>() {
+open class PythonImportVisitor(private val projectDirectory: File, private val filePath: File) : PythonParserBaseVisitor<Unit>() {
 
-    val fileDirectory = filePath.parentFile
+    private val fileDirectory = filePath.parentFile
+
+    val imports = HashSet<String>()
+    val notResolvedImport = HashSet<String>()
 
     override fun visitImport_stmt(ctx: Import_stmtContext?): Unit {
         if (ctx == null) {
@@ -47,6 +50,7 @@ open class PythonImportVisitor(val projectDirectory: File, val filePath: File) :
         }
 
         val dottedNamePath = dottedName.toNamePath()
+        imports.add(dottedNamePath.joinToString("."))
 
         if (resolveSystemImport(dottedNamePath)) {
             print("\u001b[30m")
@@ -74,6 +78,7 @@ open class PythonImportVisitor(val projectDirectory: File, val filePath: File) :
 
         print("\u001b[31m")
         println("Could not resolve $dottedNamePath")
+        notResolvedImport.add(dottedNamePath.joinToString("."))
         return false
     }
 
@@ -132,8 +137,4 @@ open class PythonImportVisitor(val projectDirectory: File, val filePath: File) :
 
         return false
     }
-}
-
-private fun PythonParser.Dotted_nameContext.toNamePath(): List<String> {
-    return (this.dotted_name()?.toNamePath() ?: listOf()) + this.name().text
 }

@@ -10,41 +10,55 @@ import org.antlr.v4.runtime.tree.ParseTree
 import java.io.File
 
 object Main {
+
     @JvmStatic
     fun main(args: Array<String>) {
         when (args.size) {
-            1 -> scanDirectory(args[0])
+            1 -> {
+                val notResolvedImports = HashSet<String>()
+                scanDirectory(args[0]) {
+                    notResolvedImports.addAll(it)
+                }
+                println("Not resolved imports: $notResolvedImports")
+            }
             else -> test()
         }
     }
 
-    fun scanDirectory(s: String) = scanDirectory(File(s), File(s))
+    fun scanDirectory(s: String, notResolvedImport: (Set<String>) -> Unit = {}) =
+        scanDirectory(File(s), File(s), notResolvedImport)
 
-    fun scanDirectory(s: File, projectDirectory: File = File(".")) {
+    fun scanDirectory(s: File, projectDirectory: File = File("."), notResolvedImport: (Set<String>) -> Unit = {}) {
         s.walk().forEach {
             if (s == it) return@forEach
 
             if (it.isFile && it.extension == "py") {
-                scanFile(it, projectDirectory)
+                scanFile(it, projectDirectory, notResolvedImport)
             } else if (it.isDirectory) {
-                scanDirectory(it, projectDirectory)
+                scanDirectory(it, projectDirectory, notResolvedImport)
             }
         }
     }
 
-    fun scanFile(file: File, projectDirectory: File = File(".")) {
+    fun scanFile(file: File, projectDirectory: File = File("."), notResolvedImport: (Set<String>) -> Unit = {}) {
         println(file.toString())
         val input = CharStreams.fromFileName(file.toString())
-        scanCharStream(input, projectDirectory, file)
+        scanCharStream(input, projectDirectory, file, notResolvedImport)
     }
 
-    fun scanCharStream(stream: CharStream, projectDirectory: File = File("."), filePath: File = File("a.py")) {
+    fun scanCharStream(
+        stream: CharStream,
+        projectDirectory: File = File("."),
+        filePath: File = File("a.py"),
+        notResolvedImport: (Set<String>) -> Unit = {},
+    ) {
         val eval = PythonImportVisitor(projectDirectory, filePath)
         val lexer = PythonLexer(stream)
         val tokens = CommonTokenStream(lexer)
         val parser = PythonParser(tokens)
         val tree: ParseTree = parser.file_input()
         eval.visit(tree)
+        notResolvedImport(eval.notResolvedImport)
     }
 
     fun test() {
