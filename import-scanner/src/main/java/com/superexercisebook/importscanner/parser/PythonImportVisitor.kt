@@ -53,30 +53,25 @@ open class PythonImportVisitor(private val projectDirectory: File, private val f
         imports.add(dottedNamePath.joinToString("."))
 
         if (resolveSystemImport(dottedNamePath)) {
-            print("\u001b[30m")
             println("Found system package: $dottedNamePath")
             return true
         }
 
         if (resolveRelativePath(dottedNamePath)) {
-            print("\u001b[30m")
             println("Found relative path: $dottedNamePath")
             return true
         }
 
         if (resolveProjectPath(dottedNamePath)) {
-            print("\u001b[30m")
             println("Found project path: $dottedNamePath")
             return true
         }
 
         if (resolveSubPath(dottedNamePath)) {
-            print("\u001b[30m")
             println("Found step path: $dottedNamePath")
             return true
         }
 
-        print("\u001b[31m")
         println("Could not resolve $dottedNamePath")
         notResolvedImport.add(dottedNamePath.joinToString("."))
         return false
