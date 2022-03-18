@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm") version "1.6.10"
     java
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.6.20-RC"
 }
 
 sourceSets {
@@ -30,8 +31,11 @@ dependencies {
 
     implementation("io.ktor:ktor-client-core:1.6.8")
     implementation("io.ktor:ktor-client-cio:1.6.8")
+    implementation("io.ktor:ktor-client-serialization:1.6.8")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.3.2")
 }
 
 tasks.getByName<Test>("test") {
-useJUnitPlatform()
+    useJUnitPlatform()
 }

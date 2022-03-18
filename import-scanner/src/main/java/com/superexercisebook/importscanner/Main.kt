@@ -5,12 +5,9 @@ import com.superexercisebook.importscanner.parser.PythonLexer
 import com.superexercisebook.importscanner.parser.PythonParser
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
-import io.ktor.client.features.*
-import io.ktor.client.features.get
+import io.ktor.client.features.json.*
+import io.ktor.client.features.json.serializer.*
 import io.ktor.client.request.*
-import io.ktor.client.response.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
 import kotlinx.coroutines.runBlocking
 import org.antlr.v4.runtime.CharStream
 import org.antlr.v4.runtime.CharStreams
@@ -35,8 +32,9 @@ object Main {
                 val foundInPypi = HashSet<String>()
                 for (item in guessImports) {
                     runBlocking {
-                        if (foundInPypi(item)) {
-                            foundInPypi.add(item)
+                        val result = foundInPypi(item)
+                        if (result.isSuccess) {
+                            foundInPypi.add(result.getOrThrow())
                         }
                     }
                 }
@@ -46,14 +44,31 @@ object Main {
         }
     }
 
-    private suspend fun foundInPypi(item: String): Boolean {
-        return try {
-            val client = HttpClient(CIO)
-            val httpStatement: HttpStatement = client.get("https://pypi.org/pypi/$item/json")
-            val response = httpStatement.execute()
-            response.status == HttpStatusCode.OK
-        } catch (e: Exception) {
-            false
+    val client = HttpClient(CIO) {
+        install(JsonFeature) {
+            serializer = KotlinxSerializer(kotlinx.serialization.json.Json{
+                isLenient = true
+                ignoreUnknownKeys = true
+            })
+
+        }
+    }
+
+    private suspend fun foundInPypi(item: String): Result<String> {
+        return when (item) {
+            "attr" -> Result.success("attrs")
+            "skimage" -> Result.success("skicit-image")
+            "OpenSSL" -> Result.success("pyOpenSSL")
+            else -> try {
+                val result: PyPIResult = client.get("https://pypi.org/pypi/$item/json")
+                if (result.isAcceptable()) {
+                    Result.success(item)
+                } else {
+                    Result.failure(IllegalStateException("Not acceptable"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
         }
     }
 
