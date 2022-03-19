@@ -40,7 +40,7 @@ object Main {
                 }
                 println("Found in pypi: $foundInPypi")
             }
-            else -> test()
+            else -> help()
         }
     }
 
@@ -106,6 +106,13 @@ object Main {
         val tree: ParseTree = parser.file_input()
         eval.visit(tree)
         notResolvedImport(eval.notResolvedImport)
+    }
+
+    fun help() {
+        println("""
+            Usage:
+            java -jar <jar> <directory>
+        """.trimIndent())
     }
 
     fun test() {
