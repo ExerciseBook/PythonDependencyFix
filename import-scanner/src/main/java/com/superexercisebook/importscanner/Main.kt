@@ -20,7 +20,7 @@ object Main {
     @JvmStatic
     fun main(args: Array<String>) {
         when (args.size) {
-            1 -> {
+            1, 2 -> {
                 val notResolvedImports = HashSet<String>()
                 scanDirectory(args[0]) {
                     notResolvedImports.addAll(it)
@@ -39,6 +39,14 @@ object Main {
                     }
                 }
                 println("Found in pypi: $foundInPypi")
+
+                if (args.size == 2) {
+                    File(args[1]).printWriter().use { c ->
+                        for (item in foundInPypi) {
+                            c.println(item)
+                        }
+                    }
+                }
             }
             else -> help()
         }
@@ -46,7 +54,7 @@ object Main {
 
     val client = HttpClient(CIO) {
         install(JsonFeature) {
-            serializer = KotlinxSerializer(kotlinx.serialization.json.Json{
+            serializer = KotlinxSerializer(kotlinx.serialization.json.Json {
                 isLenient = true
                 ignoreUnknownKeys = true
             })
@@ -54,8 +62,8 @@ object Main {
         }
     }
 
-    private suspend fun foundInPypi(item: String): Result<String> {
-        return when (item) {
+    private suspend fun foundInPypi(item: String): Result<String> =
+        when (item) {
             "attr" -> Result.success("attrs")
             "skimage" -> Result.success("skicit-image")
             "OpenSSL" -> Result.success("pyOpenSSL")
@@ -70,7 +78,6 @@ object Main {
                 Result.failure(e)
             }
         }
-    }
 
     fun scanDirectory(s: String, notResolvedImport: (Set<String>) -> Unit = {}) =
         scanDirectory(File(s), File(s), notResolvedImport)
