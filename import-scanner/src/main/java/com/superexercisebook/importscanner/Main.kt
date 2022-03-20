@@ -52,7 +52,7 @@ object Main {
         }
     }
 
-    val client = HttpClient(CIO) {
+    val httpClient = HttpClient(CIO) {
         install(JsonFeature) {
             serializer = KotlinxSerializer(kotlinx.serialization.json.Json {
                 isLenient = true
@@ -66,9 +66,11 @@ object Main {
         when (item) {
             "attr" -> Result.success("attrs")
             "skimage" -> Result.success("skicit-image")
+            "sklearn" -> Result.success("scikit-learn")
+            "cv2" -> Result.success("opencv-python")
             "OpenSSL" -> Result.success("pyOpenSSL")
             else -> try {
-                val result: PyPIResult = client.get("https://pypi.org/pypi/$item/json")
+                val result: PyPIResult = httpClient.get("https://pypi.org/pypi/$item/json")
                 if (result.isAcceptable()) {
                     Result.success(item)
                 } else {
