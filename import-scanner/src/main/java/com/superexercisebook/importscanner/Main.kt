@@ -14,6 +14,8 @@ import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.ParseTree
 import java.io.File
+import java.util.*
+import kotlin.collections.HashSet
 
 object Main {
 
@@ -29,16 +31,58 @@ object Main {
                 val guessImports = notResolvedImports.mapNotNull { it.split(".").firstOrNull() }.toSet()
                 println("Guess: $guessImports")
 
+                val failed = TreeSet<String>(String.CASE_INSENSITIVE_ORDER)
+                val dependencies = TreeMap<String, PyPIResult>(String.CASE_INSENSITIVE_ORDER)
+
                 val foundInPypi = HashSet<String>()
                 for (item in guessImports) {
                     runBlocking {
-                        val result = foundInPypi(item)
+                        val result = findInPypi(item)
                         if (result.isSuccess) {
-                            foundInPypi.add(result.getOrThrow())
+                            val dependency = result.getOrThrow()
+                            dependencies[dependency.info.name] = dependency
+                            foundInPypi.add(dependency.info.name)
+                        } else {
+                            println("Failed to find $item in pypi: ${result.exceptionOrNull()}")
+                            failed.add(item)
                         }
                     }
                 }
                 println("Found in pypi: $foundInPypi")
+
+                var loop = true
+                while (loop) {
+                    loop = false
+                    for (i in dependencies) {
+                        val pending = (i.value.info.requires_dist ?: listOf()).filter { !it.contains(";") }
+                            .map { it.split(" ").first() }.toSet()
+
+                        for (item in pending) {
+                            if (dependencies[item] != null || failed.contains(item)) {
+                                continue
+                            }
+
+                            val newDependency = runBlocking {
+                                findInPypi(item)
+                            }
+                            if (newDependency.isSuccess) {
+                                val dependency = newDependency.getOrThrow()
+                                dependencies[dependency.info.name] = dependency
+                                loop = true
+                            } else {
+                                println("Failed to find $item in pypi: ${newDependency.exceptionOrNull()}")
+                                failed.add(item)
+                            }
+                        }
+
+                        if (loop) {
+                            break
+                        }
+                    }
+                }
+
+                println("Failed: $failed")
+                println("Dependencies: ${dependencies.map{it.key + "==" + it.value.info.version}}")
 
                 if (args.size == 2) {
                     File(args[1]).printWriter().use { c ->
@@ -62,17 +106,20 @@ object Main {
         }
     }
 
-    private suspend fun foundInPypi(item: String): Result<String> =
-        when (item) {
-            "attr" -> Result.success("attrs")
-            "skimage" -> Result.success("skicit-image")
-            "sklearn" -> Result.success("scikit-learn")
-            "cv2" -> Result.success("opencv-python")
-            "OpenSSL" -> Result.success("pyOpenSSL")
-            else -> try {
-                val result: PyPIResult = httpClient.get("https://pypi.org/pypi/$item/json")
+    val pypiPackageSpecification = mapOf(
+        "attr" to "attrs",
+        "skimage" to "scikit-image",
+        "sklearn" to "scikit-learn",
+        "cv2" to "opencv-python",
+        "OpenSSL" to "pyOpenSSL",
+    )
+
+    private suspend fun findInPypi(item: String): Result<PyPIResult> =
+        pypiPackageSpecification.getOrDefault(item, item).let {
+            try {
+                val result: PyPIResult = httpClient.get("https://pypi.org/pypi/$it/json")
                 if (result.isAcceptable()) {
-                    Result.success(item)
+                    Result.success(result)
                 } else {
                     Result.failure(IllegalStateException("Not acceptable"))
                 }
@@ -122,27 +169,5 @@ object Main {
             Usage:
             java -jar <jar> <directory>
         """.trimIndent())
-    }
-
-    fun test() {
-        val input: CharStream
-        input = CharStreams.fromString("""
-            |import A
-            |from B import C
-            |from D import E, F
-            |
-            |if 1 == 2:
-            |    import G
-            |else:
-            |    import H
-            |
-            |import I
-            |from J import K, L, M, N
-            |
-            |import O.P.Q
-            |from R.S.T import U, V, W
-            |
-        """.trimMargin())
-        scanCharStream(input)
     }
 }
