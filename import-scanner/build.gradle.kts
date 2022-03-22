@@ -34,9 +34,11 @@ dependencies {
 
     implementation("io.ktor:ktor-client-core:1.6.8")
     implementation("io.ktor:ktor-client-cio:1.6.8")
-    implementation("io.ktor:ktor-client-serialization:1.6.8")
+    implementation("io.ktor:ktor-client-jackson:1.6.8")
 
-    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.3.2")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.0")
+    implementation("com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.1")
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.1")
 }
 
 tasks.getByName<Test>("test") {
@@ -61,6 +63,7 @@ tasks.withType<ShadowJar> {
 //        include { it.moduleGroup.startsWith("org.junit") }
 //        include { it.moduleGroup.startsWith("org.opentest4j") }
         include { it.moduleGroup.startsWith("org.slf4j") }
+        include { it.moduleGroup.startsWith("com.fasterxml") }
     }
 }
 

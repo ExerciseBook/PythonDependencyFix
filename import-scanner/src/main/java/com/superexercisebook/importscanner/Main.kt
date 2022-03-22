@@ -1,12 +1,18 @@
 package com.superexercisebook.importscanner
 
+import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.databind.SerializationFeature
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
+import com.fasterxml.jackson.module.kotlin.KotlinModule
+import com.fasterxml.jackson.module.kotlin.jsonMapper
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule
 import com.superexercisebook.importscanner.parser.PythonImportVisitor
 import com.superexercisebook.importscanner.parser.PythonLexer
 import com.superexercisebook.importscanner.parser.PythonParser
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.features.json.*
-import io.ktor.client.features.json.serializer.*
 import io.ktor.client.request.*
 import kotlinx.coroutines.runBlocking
 import org.antlr.v4.runtime.CharStream
@@ -15,7 +21,6 @@ import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.ParseTree
 import java.io.File
 import java.util.*
-import kotlin.collections.HashSet
 
 object Main {
 
@@ -54,7 +59,7 @@ object Main {
                 while (loop) {
                     loop = false
                     for (i in dependencies) {
-                        val pending = (i.value.info.requires_dist ?: listOf()).filter { !it.contains(";") }
+                        val pending = (i.value.info.requiresDist ?: listOf()).filter { !it.contains(";") }
                             .map { it.split(" ").first() }.toSet()
 
                         for (item in pending) {
@@ -82,13 +87,17 @@ object Main {
                 }
 
                 println("Failed: $failed")
-                println("Dependencies: ${dependencies.map{it.key + "==" + it.value.info.version}}")
+                println("Dependencies: ${dependencies.map { it.key + "==" + it.value.info.version }}")
 
                 if (args.size == 2) {
-                    File(args[1]).printWriter().use { c ->
+                    File(args[1], "scanned_import.txt") .printWriter().use { c ->
                         for (item in foundInPypi) {
                             c.println(item)
                         }
+                    }
+
+                    File(args[1], "scanned_dependencies.txt").printWriter().use { c->
+                        jsonMapper.writeValue(c, dependencies)
                     }
                 }
             }
@@ -96,13 +105,18 @@ object Main {
         }
     }
 
+    val jsonMapper = jsonMapper {
+        addModule(ParameterNamesModule())
+        addModule(Jdk8Module())
+        addModule(JavaTimeModule())
+        addModule(KotlinModule.Builder().build())
+        configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+        configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+    }
+
     val httpClient = HttpClient(CIO) {
         install(JsonFeature) {
-            serializer = KotlinxSerializer(kotlinx.serialization.json.Json {
-                isLenient = true
-                ignoreUnknownKeys = true
-            })
-
+            serializer = JacksonSerializer(jsonMapper)
         }
     }
 

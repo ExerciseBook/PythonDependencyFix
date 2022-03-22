@@ -1,23 +1,23 @@
 package com.superexercisebook.importscanner
 
-import kotlinx.datetime.LocalDateTime
-import kotlinx.serialization.Serializable
+import com.fasterxml.jackson.annotation.JsonProperty
+import java.time.LocalDateTime
 
 
-@Serializable
-data class PyPIResult(val info: PyPIInfo, val releases: Map<String, List<PyPIResultRelease>>)
-
-@Serializable
-data class PyPIInfo(
-    val author: String? = null,
-    val name: String,
-    val version: String,
-
-    val requires_dist: List<String>? = null,
+data class PyPIResult(
+    @JsonProperty("info") val info: PyPIInfo,
+    @JsonProperty("releases") val releases: Map<String, List<PyPIResultRelease>>,
 )
 
-@Serializable
+data class PyPIInfo(
+    @JsonProperty("author") val author: String? = null,
+    @JsonProperty("name") val name: String,
+    @JsonProperty("version") val version: String,
+
+    @JsonProperty("requires_dist") val requiresDist: List<String>? = null,
+)
+
 data class PyPIResultRelease(
-    val upload_time: LocalDateTime,
-    val python_version: String? = null,
+    @JsonProperty("upload_time") val uploadTime: LocalDateTime,
+    @JsonProperty("python_version") val pythonVersion: String? = null,
 )
