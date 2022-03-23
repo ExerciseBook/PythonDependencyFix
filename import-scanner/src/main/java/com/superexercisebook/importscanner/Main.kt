@@ -90,13 +90,13 @@ object Main {
                 println("Dependencies: ${dependencies.map { it.key + "==" + it.value.info.version }}")
 
                 if (args.size == 2) {
-                    File(args[1], "scanned_import.txt") .printWriter().use { c ->
+                    File(args[1], "scanned_import.txt").printWriter().use { c ->
                         for (item in foundInPypi) {
                             c.println(item)
                         }
                     }
 
-                    File(args[1], "scanned_dependencies.txt").printWriter().use { c->
+                    File(args[1], "scanned_dependencies.txt").printWriter().use { c ->
                         jsonMapper.writeValue(c, dependencies)
                     }
                 }
@@ -132,10 +132,11 @@ object Main {
         pypiPackageSpecification.getOrDefault(item, item).let {
             try {
                 val result: PyPIResult = httpClient.get("https://pypi.org/pypi/$it/json")
-                if (result.isAcceptable()) {
+                val acceptable = result.isAcceptable()
+                if (acceptable.isSuccess) {
                     Result.success(result)
                 } else {
-                    Result.failure(IllegalStateException("Not acceptable"))
+                    Result.failure(acceptable.exceptionOrNull()!!)
                 }
             } catch (e: Exception) {
                 Result.failure(e)
