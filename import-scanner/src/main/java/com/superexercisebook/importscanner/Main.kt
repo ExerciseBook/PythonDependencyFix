@@ -86,6 +86,8 @@ object Main {
                     }
                 }
 
+                val cleanedDependencies = dependencies.getAcceptableVersion()
+
                 println("Failed: $failed")
                 println("Dependencies: ${dependencies.map { it.key + "==" + it.value.info.version }}")
 
@@ -96,8 +98,8 @@ object Main {
                         }
                     }
 
-                    File(args[1], "scanned_dependencies.txt").printWriter().use { c ->
-                        jsonMapper.writeValue(c, dependencies)
+                    File(args[1], "scanned_dependencies.json").printWriter().use { c ->
+                        jsonMapper.writeValue(c, cleanedDependencies)
                     }
                 }
             }

@@ -10,18 +10,8 @@ fun PyPIResult.isAcceptable(): Result<Unit> {
         ?: return Result.failure(IllegalStateException("No release found for package ${this.info.name} version $latestVersion"))
 
     latestRelease.forEach { release ->
-        val pythonVersion = release.pythonVersion
-        if (pythonVersion != null) {
-            if (pythonVersion.startsWith("3") ||
-                pythonVersion.contains("py3", ignoreCase = true) ||
-                pythonVersion.contains("cp3", ignoreCase = true) ||
-                (
-                        pythonVersion.equals("source", ignoreCase = true) &&
-                                release.uploadTime > LocalDateTime.of(2019, 1, 1, 0, 0, 0)
-                        )
-            ) {
-                return Result.success(Unit)
-            }
+        if (release.isAcceptable().isSuccess) {
+            return Result.success(Unit)
         }
     }
 
@@ -34,4 +24,49 @@ fun PyPIResult.isAcceptable(): Result<Unit> {
                         it.pythonVersion
                 }.joinToString("\n"))
     )
+}
+
+private fun PyPIResultRelease.isAcceptable(): Result<Unit> {
+    val pythonVersion = this.pythonVersion
+    if (pythonVersion != null) {
+        if (pythonVersion.startsWith("3") ||
+            pythonVersion.contains("py3", ignoreCase = true) ||
+            pythonVersion.contains("cp3", ignoreCase = true) ||
+            (
+                    pythonVersion.equals("source", ignoreCase = true) &&
+                            this.uploadTime > LocalDateTime.of(2019, 1, 1, 0, 0, 0)
+                    )
+        ) {
+            return Result.success(Unit)
+        }
+    }
+    return Result.failure(IllegalStateException())
+}
+
+fun Map<String, PyPIResult>.getAcceptableVersion(): Map<String, PyPIResult> {
+    val ret = mutableMapOf<String, PyPIResult>()
+
+    for ((name, pypiMeta) in this) {
+        ret[name] = PyPIResult(pypiMeta.info, mutableMapOf<String, List<PyPIResultRelease>>().also { releaseMap ->
+            for ((pypiVersion, pypiReleases) in pypiMeta.releases) {
+                if (pypiReleases.isEmpty()) {
+                    continue
+                }
+
+                mutableListOf<PyPIResultRelease>().also { releaseList ->
+                    for (pypiReleaseItem in pypiReleases) {
+                        if (pypiReleaseItem.isAcceptable().isSuccess) {
+                            releaseList.add(pypiReleaseItem)
+                        }
+                    }
+                }.also {
+                    if (it.isNotEmpty()) {
+                        releaseMap[pypiVersion] = it
+                    }
+                }
+            }
+        })
+    }
+
+    return ret
 }
