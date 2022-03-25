@@ -26,7 +26,7 @@ fun PyPIResult.isAcceptable(): Result<Unit> {
     )
 }
 
-private fun PyPIResultRelease.isAcceptable(): Result<Unit> {
+fun PyPIResultRelease.isAcceptable(): Result<Unit> {
     val pythonVersion = this.pythonVersion
     if (pythonVersion != null) {
         if (pythonVersion.startsWith("3") ||
@@ -69,4 +69,68 @@ fun Map<String, PyPIResult>.getAcceptableVersion(): Map<String, PyPIResult> {
     }
 
     return ret
+}
+
+fun Map<String, PyPIResult>.toDag(): List<DagNode> {
+    val dagPool = mapOf(* this.map { it.key to DagNode(it.key, mutableListOf(), 0) }.toTypedArray())
+
+    for ((name, pypiMeta) in this) {
+        val dependencies = pypiMeta.getDependenciesSet()
+
+        val node = dagPool[name] ?: continue
+
+        for (dependency in dependencies) {
+            val dependencyNode = dagPool[dependency] ?: continue
+            node.successorList.add(dependencyNode)
+            dependencyNode.precursorCount += 1
+        }
+    }
+
+    return dagPool.filter { it.value.precursorCount == 0 }.map { it.value }.toList()
+}
+
+fun PyPIResult.getDependenciesSet() =
+    (this.info.requiresDist ?: listOf()).filter { !it.contains(";") }
+        .map { it.split(" ").first() }.toSet()
+
+fun List<DagNode>.print(layer: Int = 0, required: MutableSet<String> = mutableSetOf()): String {
+    val ret = StringBuilder()
+
+    for (node in this) {
+        if (layer == 0) {
+            ret.append(node.name)
+            ret.append("\n")
+        }
+        node.successorList.forEach {
+            ret.append("|  " * layer)
+            ret.append("+- ")
+            if (required.contains(it.name)) {
+                ret.append("*")
+            }
+            required.add(it.name)
+            ret.append(it.name)
+            ret.append("\n")
+
+            ret.append(it.successorList.print(layer + 1, required))
+
+        }
+    }
+
+    return ret.toString()
+}
+
+operator fun String.times(times: Int): String {
+    val builder = StringBuilder()
+    for (i in 0 until times) {
+        builder.append(this)
+    }
+    return builder.toString()
+}
+
+operator fun Char.times(times: Int): String {
+    val builder = StringBuilder()
+    for (i in 0 until times) {
+        builder.append(this)
+    }
+    return builder.toString()
 }

@@ -21,3 +21,9 @@ data class PyPIResultRelease(
     @JsonProperty("upload_time") val uploadTime: LocalDateTime,
     @JsonProperty("python_version") val pythonVersion: String? = null,
 )
+
+data class DagNode(
+    @JsonProperty("name") val name: String,
+    @JsonProperty("children") val successorList: MutableList<DagNode>,
+    @JsonProperty("precursor_count") var precursorCount: Int,
+)

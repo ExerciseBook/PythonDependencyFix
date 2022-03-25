@@ -59,8 +59,7 @@ object Main {
                 while (loop) {
                     loop = false
                     for (i in dependencies) {
-                        val pending = (i.value.info.requiresDist ?: listOf()).filter { !it.contains(";") }
-                            .map { it.split(" ").first() }.toSet()
+                        val pending = i.value.getDependenciesSet()
 
                         for (item in pending) {
                             if (dependencies[item] != null || failed.contains(item)) {
@@ -91,6 +90,9 @@ object Main {
                 println("Failed: $failed")
                 println("Dependencies: ${dependencies.map { it.key + "==" + it.value.info.version }}")
 
+                val dependenciesDag = cleanedDependencies.toDag()
+                println("Dependencies DAG: \r\n${dependenciesDag.print()}")
+
                 if (args.size == 2) {
                     File(args[1], "scanned_import.txt").printWriter().use { c ->
                         for (item in foundInPypi) {
@@ -98,8 +100,12 @@ object Main {
                         }
                     }
 
-                    File(args[1], "scanned_dependencies.json").printWriter().use { c ->
+                    File(args[1], "scanned_dependencies_version.json").printWriter().use { c ->
                         jsonMapper.writeValue(c, cleanedDependencies)
+                    }
+
+                    File(args[1], "scanned_dependencies_requirements.txt").printWriter().use { c ->
+                        dependenciesDag.forEach { c.println(it.name) }
                     }
                 }
             }
