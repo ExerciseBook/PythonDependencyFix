@@ -39,6 +39,9 @@ dependencies {
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.13.0")
     implementation("com.fasterxml.jackson.module:jackson-module-parameter-names:2.13.1")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.13.1")
+
+    implementation("org.eclipse.jgit:org.eclipse.jgit:6.1.0.202203080745-r")
+    implementation("io.github.g00fy2:versioncompare:1.5.0")
 }
 
 tasks.getByName<Test>("test") {
@@ -64,6 +67,8 @@ tasks.withType<ShadowJar> {
 //        include { it.moduleGroup.startsWith("org.opentest4j") }
         include { it.moduleGroup.startsWith("org.slf4j") }
         include { it.moduleGroup.startsWith("com.fasterxml") }
+        include { it.moduleGroup.startsWith("org.eclipse") }
+        include { it.moduleGroup.startsWith("io.github") }
     }
 }
 

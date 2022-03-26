@@ -18,7 +18,7 @@ data class PyPIInfo(
 )
 
 data class PyPIResultRelease(
-    @JsonProperty("upload_time") val uploadTime: LocalDateTime,
+    @JsonProperty("upload_time_iso_8601") val uploadTime: LocalDateTime,
     @JsonProperty("python_version") val pythonVersion: String? = null,
 )
 

@@ -19,17 +19,44 @@ import org.antlr.v4.runtime.CharStream
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.ParseTree
+import org.eclipse.jgit.api.Git
+import org.eclipse.jgit.lib.Constants
 import java.io.File
+import java.text.DateFormat
+import java.text.SimpleDateFormat
+import java.time.ZoneId
 import java.util.*
 
+
 object Main {
+
+    val df2: DateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
 
     @JvmStatic
     fun main(args: Array<String>) {
         when (args.size) {
             1, 2 -> {
+                val projectRoot = args[0]
+
+                val headTime =  try {
+                    Git.open(File(projectRoot)).use { git ->
+                        val repo = git.repository
+                        val commitId = repo.resolve(Constants.HEAD)
+                        println("Current Head: ${commitId.name}")
+
+                        val commit = repo.parseCommit(commitId)
+                        println("Commit Author: ${commit.authorIdent.name}")
+                        val time = Date.from(commit.authorIdent.whenAsInstant)
+                        println("Commit Time: ${df2.format(time)}")
+                        time
+                    }
+                } catch (e: Exception) {
+                    println("Error: ${e.message}")
+                    Date()
+                }.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime()
+
                 val notResolvedImports = HashSet<String>()
-                scanDirectory(args[0]) {
+                scanDirectory(projectRoot) {
                     notResolvedImports.addAll(it)
                 }
                 println("Not resolved imports: $notResolvedImports")
@@ -85,13 +112,15 @@ object Main {
                     }
                 }
 
-                val cleanedDependencies = dependencies.getAcceptableVersion()
+                val cleanedDependencies = dependencies.getAcceptableVersion(releaseBefore = headTime)
 
                 println("Failed: $failed")
                 println("Dependencies: ${dependencies.map { it.key + "==" + it.value.info.version }}")
 
                 val dependenciesDag = cleanedDependencies.toDag()
                 println("Dependencies DAG: \r\n${dependenciesDag.print()}")
+
+                println("Clean dependencies: ${cleanedDependencies.map { it.key + "==" + it.value.getLatestVersion().first }}")
 
                 if (args.size == 2) {
                     File(args[1], "scanned_import.txt").printWriter().use { c ->
@@ -105,7 +134,7 @@ object Main {
                     }
 
                     File(args[1], "scanned_dependencies_requirements.txt").printWriter().use { c ->
-                        dependenciesDag.forEach { c.println(it.name) }
+                        dependenciesDag.forEach { c.println(it.name + "==" + cleanedDependencies[it.name]!!.getLatestVersion().first) }
                     }
                 }
             }
