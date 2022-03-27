@@ -93,7 +93,8 @@ fun Map<String, PyPIResult>.toDag(): List<DagNode> {
     return dagPool.filter { it.value.precursorCount == 0 }.map { it.value }.toList()
 }
 
-fun PyPIResult.getLatestVersion() : Pair<String, List<PyPIResultRelease>>{
+fun PyPIResult.getLatestVersion() : Result<Pair<String, List<PyPIResultRelease>>>{
+    var found = false
     var retVersion = "0.0.0"
     var retInfo = listOf(PyPIResultRelease( LocalDateTime.now(), null))
 
@@ -101,10 +102,11 @@ fun PyPIResult.getLatestVersion() : Pair<String, List<PyPIResultRelease>>{
         if (Version(version) > Version(retVersion)) {
             retVersion = version
             retInfo = info
+            found = true
         }
     }
 
-    return retVersion to retInfo
+    return if (found) Result.success(retVersion to retInfo) else Result.failure(IllegalStateException())
 }
 
 fun PyPIResult.getDependenciesSet() =

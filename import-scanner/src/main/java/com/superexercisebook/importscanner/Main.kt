@@ -38,7 +38,7 @@ object Main {
             1, 2 -> {
                 val projectRoot = args[0]
 
-                val headTime =  try {
+                val headTime = try {
                     Git.open(File(projectRoot)).use { git ->
                         val repo = git.repository
                         val commitId = repo.resolve(Constants.HEAD)
@@ -120,7 +120,17 @@ object Main {
                 val dependenciesDag = cleanedDependencies.toDag()
                 println("Dependencies DAG: \r\n${dependenciesDag.print()}")
 
-                println("Clean dependencies: ${cleanedDependencies.map { it.key + "==" + it.value.getLatestVersion().first }}")
+                println("Clean dependencies: ${
+                    cleanedDependencies.map {
+                        it.value.getLatestVersion().let { c ->
+                            if (c.isSuccess) {
+                                it.key + "==" + c.getOrThrow().first
+                            } else {
+                                it.key
+                            }
+                        }
+                    }
+                }")
 
                 if (args.size == 2) {
                     File(args[1], "scanned_import.txt").printWriter().use { c ->
@@ -134,7 +144,15 @@ object Main {
                     }
 
                     File(args[1], "scanned_dependencies_requirements.txt").printWriter().use { c ->
-                        dependenciesDag.forEach { c.println(it.name + "==" + cleanedDependencies[it.name]!!.getLatestVersion().first) }
+                        dependenciesDag.forEach {
+                            c.println(it.name + cleanedDependencies[it.name]!!.getLatestVersion().let { c ->
+                                if (c.isSuccess) {
+                                    "==" + c.getOrThrow().first
+                                } else {
+                                    ""
+                                }
+                            })
+                        }
                     }
                 }
             }
