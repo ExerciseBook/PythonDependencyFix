@@ -181,6 +181,7 @@ object Main {
         "sklearn" to "scikit-learn",
         "cv2" to "opencv-python",
         "OpenSSL" to "pyOpenSSL",
+        "pydispatch" to "PyDispatcher",
     )
 
     private suspend fun findInPypi(item: String): Result<PyPIResult> =
