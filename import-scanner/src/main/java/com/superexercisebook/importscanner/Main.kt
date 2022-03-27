@@ -158,6 +158,9 @@ object Main {
 
                             nv.println(it.name)
                         }
+
+                        v.close()
+                        nv.close()
                     }
                 }
             }
