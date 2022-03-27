@@ -124,7 +124,7 @@ object Main {
                     cleanedDependencies.map {
                         it.value.getLatestVersion().let { c ->
                             if (c.isSuccess) {
-                                it.key + "==" + c.getOrThrow().first
+                                it.key + "<=" + c.getOrThrow().first
                             } else {
                                 it.key
                             }
@@ -147,7 +147,7 @@ object Main {
                         dependenciesDag.forEach {
                             c.println(it.name + cleanedDependencies[it.name]!!.getLatestVersion().let { c ->
                                 if (c.isSuccess) {
-                                    "==" + c.getOrThrow().first
+                                    "<=" + c.getOrThrow().first
                                 } else {
                                     ""
                                 }
