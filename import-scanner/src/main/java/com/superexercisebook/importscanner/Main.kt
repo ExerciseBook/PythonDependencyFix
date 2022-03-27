@@ -143,15 +143,20 @@ object Main {
                         jsonMapper.writeValue(c, cleanedDependencies)
                     }
 
-                    File(args[1], "scanned_dependencies_requirements.txt").printWriter().use { c ->
+                    run {
+                        val v = File(args[1], "scanned_dependencies_requirements_with_version.txt").printWriter()
+                        val nv = File(args[1], "scanned_dependencies_requirements_without_version.txt").printWriter()
+
                         dependenciesDag.forEach {
-                            c.println(it.name + cleanedDependencies[it.name]!!.getLatestVersion().let { c ->
+                            v.println(it.name + cleanedDependencies[it.name]!!.getLatestVersion().let { c ->
                                 if (c.isSuccess) {
                                     "<=" + c.getOrThrow().first
                                 } else {
                                     ""
                                 }
                             })
+
+                            nv.println(it.name)
                         }
                     }
                 }
