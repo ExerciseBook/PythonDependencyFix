@@ -3,7 +3,9 @@ package com.superexercisebook.importscanner
 import io.github.g00fy2.versioncompare.Version
 import java.time.LocalDateTime
 
-
+/**
+ * Check package is acceptable or not
+ */
 fun PyPIResult.isAcceptable(): Result<Unit> {
     val latestVersion = this.info.version
 
@@ -27,6 +29,9 @@ fun PyPIResult.isAcceptable(): Result<Unit> {
     )
 }
 
+/**
+ * Check release (version) is acceptable or not
+ */
 fun PyPIResultRelease.isAcceptable(releaseBefore: LocalDateTime = LocalDateTime.now()): Result<Unit> {
     val pythonVersion = this.pythonVersion
     if (this.uploadTime > releaseBefore) {
@@ -47,6 +52,9 @@ fun PyPIResultRelease.isAcceptable(releaseBefore: LocalDateTime = LocalDateTime.
     return Result.failure(IllegalStateException())
 }
 
+/**
+ * Get acceptable version of package
+ */
 fun Map<String, PyPIResult>.getAcceptableVersion(releaseBefore: LocalDateTime = LocalDateTime.now()): Map<String, PyPIResult> {
     val ret = mutableMapOf<String, PyPIResult>()
 
@@ -75,6 +83,10 @@ fun Map<String, PyPIResult>.getAcceptableVersion(releaseBefore: LocalDateTime = 
     return ret
 }
 
+/**
+ * Construct a dag.
+ * Return a list representing every node with no precursor.
+ */
 fun Map<String, PyPIResult>.toDag(): List<DagNode> {
     val dagPool = mapOf(* this.map { it.key to DagNode(it.key, mutableListOf(), 0) }.toTypedArray())
 
@@ -93,6 +105,9 @@ fun Map<String, PyPIResult>.toDag(): List<DagNode> {
     return dagPool.filter { it.value.precursorCount == 0 }.map { it.value }.toList()
 }
 
+/**
+ * Get the latest version of package
+ */
 fun PyPIResult.getLatestVersion() : Result<Pair<String, List<PyPIResultRelease>>>{
     var found = false
     var retVersion = "0.0.0"
@@ -109,10 +124,16 @@ fun PyPIResult.getLatestVersion() : Result<Pair<String, List<PyPIResultRelease>>
     return if (found) Result.success(retVersion to retInfo) else Result.failure(IllegalStateException())
 }
 
+/**
+ * Get dependencies of a package. Filtering out the conditional dependencies.
+ */
 fun PyPIResult.getDependenciesSet() =
     (this.info.requiresDist ?: listOf()).filter { !it.contains(";") }
         .map { it.split(" ").first() }.toSet()
 
+/**
+ * Write the dag.
+ */
 fun List<DagNode>.print(layer: Int = 0, required: MutableSet<String> = mutableSetOf()): String {
     val ret = StringBuilder()
 

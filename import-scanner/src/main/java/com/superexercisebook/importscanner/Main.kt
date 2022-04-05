@@ -1,71 +1,50 @@
 package com.superexercisebook.importscanner
 
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.SerializationFeature
-import com.fasterxml.jackson.datatype.jdk8.Jdk8Module
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
-import com.fasterxml.jackson.module.kotlin.KotlinModule
-import com.fasterxml.jackson.module.kotlin.jsonMapper
-import com.fasterxml.jackson.module.paramnames.ParameterNamesModule
-import com.superexercisebook.importscanner.parser.PythonImportVisitor
-import com.superexercisebook.importscanner.parser.PythonLexer
-import com.superexercisebook.importscanner.parser.PythonParser
-import io.ktor.client.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.features.json.*
-import io.ktor.client.request.*
+import com.superexercisebook.importscanner.PyPIUtils.findInPypi
+import com.superexercisebook.importscanner.PythonProjectWalker.scanDirectory
 import kotlinx.coroutines.runBlocking
-import org.antlr.v4.runtime.CharStream
-import org.antlr.v4.runtime.CharStreams
-import org.antlr.v4.runtime.CommonTokenStream
-import org.antlr.v4.runtime.tree.ParseTree
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.Constants
 import java.io.File
-import java.text.DateFormat
-import java.text.SimpleDateFormat
+import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.*
+import kotlin.collections.set
 
 
 object Main {
 
-    val df2: DateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
 
     @JvmStatic
     fun main(args: Array<String>) {
         when (args.size) {
             1, 2 -> {
+                // project root
                 val projectRoot = args[0]
 
-                val headTime = try {
-                    Git.open(File(projectRoot)).use { git ->
-                        val repo = git.repository
-                        val commitId = repo.resolve(Constants.HEAD)
-                        println("Current Head: ${commitId.name}")
+                // commit time of current commit
+                // if no commit time is given, use current time
+                val headTime = getProjectHeadTime(projectRoot)
 
-                        val commit = repo.parseCommit(commitId)
-                        println("Commit Author: ${commit.authorIdent.name}")
-                        val time = Date.from(commit.authorIdent.whenAsInstant)
-                        println("Commit Time: ${df2.format(time)}")
-                        time
-                    }
-                } catch (e: Exception) {
-                    println("Error: ${e.message}")
-                    Date()
-                }.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime()
-
+                // get all not resolved imports
                 val notResolvedImports = HashSet<String>()
                 scanDirectory(projectRoot) {
                     notResolvedImports.addAll(it)
                 }
                 println("Not resolved imports: $notResolvedImports")
+
+                // extra the first elements from every element in [notResolvedImports]
+                // e.g. A.B.C in notResolvedImports, A in guessImports
                 val guessImports = notResolvedImports.mapNotNull { it.split(".").firstOrNull() }.toSet()
                 println("Guess: $guessImports")
 
+                // fail to find in PyPI, for skipping retry
                 val failed = TreeSet<String>(String.CASE_INSENSITIVE_ORDER)
+                // found in PyPI
                 val dependencies = TreeMap<String, PyPIResult>(String.CASE_INSENSITIVE_ORDER)
 
+                // find all dependencies in PyPI
+                // package name found in PyPI
                 val foundInPypi = HashSet<String>()
                 for (item in guessImports) {
                     runBlocking {
@@ -82,20 +61,26 @@ object Main {
                 }
                 println("Found in pypi: $foundInPypi")
 
+                // find all dependencies in PyPI
                 var loop = true
                 while (loop) {
                     loop = false
-                    for (i in dependencies) {
-                        val pending = i.value.getDependenciesSet()
+                    for ((_, value) in dependencies) {
+                        // get all dependencies of current dependency
+                        val pending = value.getDependenciesSet()
 
                         for (item in pending) {
+                            // filter out the dependencies that are already found in PyPI or failed to find in PyPI
                             if (dependencies[item] != null || failed.contains(item)) {
                                 continue
                             }
 
+                            // try to search in PyPI
                             val newDependency = runBlocking {
                                 findInPypi(item)
                             }
+
+                            // if found, add to dependencies
                             if (newDependency.isSuccess) {
                                 val dependency = newDependency.getOrThrow()
                                 dependencies[dependency.info.name] = dependency
@@ -112,26 +97,32 @@ object Main {
                     }
                 }
 
+                // clean dependencies
+                // in some cases we could get some strange dependencies like "mail", which did not update for a long time
                 val cleanedDependencies = dependencies.getAcceptableVersion(releaseBefore = headTime)
 
                 println("Failed: $failed")
                 println("Dependencies: ${dependencies.map { it.key + "==" + it.value.info.version }}")
 
+                // construct a dag by dependencies we found
+                // in some cases a program may import package A, and package A depends on package B,
+                // but this program will also import B and use it,
+                // we could filter out the dependency B, in this step
                 val dependenciesDag = cleanedDependencies.toDag()
                 println("Dependencies DAG: \r\n${dependenciesDag.print()}")
 
                 println("Clean dependencies: ${
                     cleanedDependencies.map {
-                        it.value.getLatestVersion().let { c ->
-                            if (c.isSuccess) {
-                                it.key + "<=" + c.getOrThrow().first
-                            } else {
-                                it.key
-                            }
+                        val c = it.value.getLatestVersion()
+                        if (c.isSuccess) {
+                            it.key + "<=" + c.getOrThrow().first
+                        } else {
+                            it.key
                         }
                     }
                 }")
 
+                // write to file
                 if (args.size == 2) {
                     File(args[1], "scanned_import.txt").printWriter().use { c ->
                         for (item in foundInPypi) {
@@ -168,85 +159,29 @@ object Main {
         }
     }
 
-    val jsonMapper = jsonMapper {
-        addModule(ParameterNamesModule())
-        addModule(Jdk8Module())
-        addModule(JavaTimeModule())
-        addModule(KotlinModule.Builder().build())
-        configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-        configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
-    }
+    private fun getProjectHeadTime(projectRoot: String): LocalDateTime =
+        try {
+            Git.open(File(projectRoot)).use { git ->
+                val repo = git.repository
+                val commitId = repo.resolve(Constants.HEAD)
+                println("Current Head: ${commitId.name}")
 
-    val httpClient = HttpClient(CIO) {
-        install(JsonFeature) {
-            serializer = JacksonSerializer(jsonMapper)
-        }
-    }
-
-    val pypiPackageSpecification = mapOf(
-        "attr" to "attrs",
-        "skimage" to "scikit-image",
-        "sklearn" to "scikit-learn",
-        "cv2" to "opencv-python",
-        "OpenSSL" to "pyOpenSSL",
-        "pydispatch" to "PyDispatcher",
-    )
-
-    private suspend fun findInPypi(item: String): Result<PyPIResult> =
-        pypiPackageSpecification.getOrDefault(item, item).let {
-            try {
-                val result: PyPIResult = httpClient.get("https://pypi.org/pypi/$it/json")
-                val acceptable = result.isAcceptable()
-                if (acceptable.isSuccess) {
-                    Result.success(result)
-                } else {
-                    Result.failure(acceptable.exceptionOrNull()!!)
-                }
-            } catch (e: Exception) {
-                Result.failure(e)
+                val commit = repo.parseCommit(commitId)
+                println("Commit Author: ${commit.authorIdent.name}")
+                val time = Date.from(commit.authorIdent.whenAsInstant)
+                println("Commit Time: ${df2.format(time)}")
+                time
             }
-        }
+        } catch (e: Exception) {
+            println("Error: ${e.message}")
+            Date()
+        }.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime()
 
-    fun scanDirectory(s: String, notResolvedImport: (Set<String>) -> Unit = {}) =
-        scanDirectory(File(s), File(s), notResolvedImport)
-
-    fun scanDirectory(s: File, projectDirectory: File = File("."), notResolvedImport: (Set<String>) -> Unit = {}) {
-        s.walk().forEach {
-            if (s == it) return@forEach
-
-            if (it.isFile && it.extension == "py") {
-                scanFile(it, projectDirectory, notResolvedImport)
-            } else if (it.isDirectory) {
-                scanDirectory(it, projectDirectory, notResolvedImport)
-            }
-        }
-    }
-
-    fun scanFile(file: File, projectDirectory: File = File("."), notResolvedImport: (Set<String>) -> Unit = {}) {
-        println(file.toString())
-        val input = CharStreams.fromFileName(file.toString())
-        scanCharStream(input, projectDirectory, file, notResolvedImport)
-    }
-
-    fun scanCharStream(
-        stream: CharStream,
-        projectDirectory: File = File("."),
-        filePath: File = File("a.py"),
-        notResolvedImport: (Set<String>) -> Unit = {},
-    ) {
-        val eval = PythonImportVisitor(projectDirectory, filePath)
-        val lexer = PythonLexer(stream)
-        val tokens = CommonTokenStream(lexer)
-        val parser = PythonParser(tokens)
-        val tree: ParseTree = parser.file_input()
-        eval.visit(tree)
-        notResolvedImport(eval.notResolvedImport)
-    }
 
     fun help() {
         println("""
             Usage:
-            java -jar <jar> <directory>
+            java -jar <jar> <project directory> <output directory>
         """.trimIndent())
     }
 }
