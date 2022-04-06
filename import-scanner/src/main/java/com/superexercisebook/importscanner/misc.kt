@@ -38,13 +38,14 @@ fun PyPIResultRelease.isAcceptable(releaseBefore: LocalDateTime = LocalDateTime.
         return Result.failure(IllegalStateException())
     }
     if (pythonVersion != null) {
+        if (this.uploadTime < LocalDateTime.of(2019, 1, 1, 0, 0, 0)) {
+            return Result.failure(IllegalStateException())
+        }
+
         if (pythonVersion.startsWith("3") ||
             pythonVersion.contains("py3", ignoreCase = true) ||
             pythonVersion.contains("cp3", ignoreCase = true) ||
-            (
-                    pythonVersion.equals("source", ignoreCase = true) &&
-                            this.uploadTime > LocalDateTime.of(2019, 1, 1, 0, 0, 0)
-                    )
+            pythonVersion.equals("source", ignoreCase = true)
         ) {
             return Result.success(Unit)
         }
@@ -108,10 +109,10 @@ fun Map<String, PyPIResult>.toDag(): List<DagNode> {
 /**
  * Get the latest version of package
  */
-fun PyPIResult.getLatestVersion() : Result<Pair<String, List<PyPIResultRelease>>>{
+fun PyPIResult.getLatestVersion(): Result<Pair<String, List<PyPIResultRelease>>> {
     var found = false
     var retVersion = "0.0.0"
-    var retInfo = listOf(PyPIResultRelease( LocalDateTime.now(), null))
+    var retInfo = listOf(PyPIResultRelease(LocalDateTime.now(), null))
 
     for ((version, info) in this.releases) {
         if (Version(version) > Version(retVersion)) {
