@@ -182,9 +182,9 @@ object Main {
                     println("No version found")
                 }
 
-                if (args.size == 3) {
+                if (args.size == 4) {
                     if (selectedVersion != null) {
-                        File(args[2], "suggest_dependency.json").printWriter().use { c ->
+                        File(args[3], "suggest_dependency.json").printWriter().use { c ->
                             jsonMapper.writeValue(c, mapOf(
                                 "name" to packageName,
                                 "meta" to dependency,
