@@ -193,7 +193,7 @@ object Main {
                             ))
                         }
 
-                        File(args[2], "suggest_dependency_with_version.txt").printWriter().use { c ->
+                        File(args[3], "suggest_dependency_with_version.txt").printWriter().use { c ->
                             if ( latestVersion.isSuccess) {
                                 c.println("$packageName<=${latestVersion.getOrThrow().first}")
                             } else {
@@ -201,7 +201,7 @@ object Main {
                             }
                         }
 
-                        File(args[2], "suggest_dependency_without_version.txt").printWriter().use { c ->
+                        File(args[3], "suggest_dependency_without_version.txt").printWriter().use { c ->
                             c.println(packageName)
                         }
                     }
