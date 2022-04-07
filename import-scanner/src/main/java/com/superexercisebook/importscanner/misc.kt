@@ -60,29 +60,33 @@ fun Map<String, PyPIResult>.getAcceptableVersion(releaseBefore: LocalDateTime = 
     val ret = mutableMapOf<String, PyPIResult>()
 
     for ((name, pypiMeta) in this) {
-        ret[name] = PyPIResult(pypiMeta.info, mutableMapOf<String, List<PyPIResultRelease>>().also { releaseMap ->
-            for ((pypiVersion, pypiReleases) in pypiMeta.releases) {
-                if (pypiReleases.isEmpty()) {
-                    continue
-                }
-
-                mutableListOf<PyPIResultRelease>().also { releaseList ->
-                    for (pypiReleaseItem in pypiReleases) {
-                        if (pypiReleaseItem.isAcceptable(releaseBefore = releaseBefore).isSuccess) {
-                            releaseList.add(pypiReleaseItem)
-                        }
-                    }
-                }.also {
-                    if (it.isNotEmpty()) {
-                        releaseMap[pypiVersion] = it
-                    }
-                }
-            }
-        })
+        ret[name] = pypiMeta.getAcceptableVersion(releaseBefore)
     }
 
     return ret
 }
+
+fun PyPIResult.getAcceptableVersion(releaseBefore: LocalDateTime): PyPIResult =
+    PyPIResult(this.info, mutableMapOf<String, List<PyPIResultRelease>>().also { releaseMap ->
+        for ((pypiVersion, pypiReleases) in this.releases) {
+            if (pypiReleases.isEmpty()) {
+                continue
+            }
+
+            mutableListOf<PyPIResultRelease>().also { releaseList ->
+                for (pypiReleaseItem in pypiReleases) {
+                    if (pypiReleaseItem.isAcceptable(releaseBefore = releaseBefore).isSuccess) {
+                        releaseList.add(pypiReleaseItem)
+                    }
+                }
+            }.also {
+                if (it.isNotEmpty()) {
+                    releaseMap[pypiVersion] = it
+                }
+            }
+        }
+    })
+
 
 /**
  * Construct a dag.

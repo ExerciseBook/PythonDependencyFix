@@ -13,14 +13,12 @@ import kotlin.collections.set
 
 
 object Main {
-
-
     @JvmStatic
     fun main(args: Array<String>) {
-        when (args.size) {
-            1, 2 -> {
+        when {
+            (args.size == 2 || args.size == 3) && (args[0] == "scan-project") -> {
                 // project root
-                val projectRoot = args[0]
+                val projectRoot = args[1]
 
                 // commit time of current commit
                 // if no commit time is given, use current time
@@ -123,20 +121,20 @@ object Main {
                 }")
 
                 // write to file
-                if (args.size == 2) {
-                    File(args[1], "scanned_import.txt").printWriter().use { c ->
+                if (args.size == 3) {
+                    File(args[2], "scanned_import.txt").printWriter().use { c ->
                         for (item in foundInPypi) {
                             c.println(item)
                         }
                     }
 
-                    File(args[1], "scanned_dependencies_version.json").printWriter().use { c ->
+                    File(args[2], "scanned_dependencies_version.json").printWriter().use { c ->
                         jsonMapper.writeValue(c, cleanedDependencies)
                     }
 
                     run {
-                        val v = File(args[1], "scanned_dependencies_requirements_with_version.txt").printWriter()
-                        val nv = File(args[1], "scanned_dependencies_requirements_without_version.txt").printWriter()
+                        val v = File(args[2], "scanned_dependencies_requirements_with_version.txt").printWriter()
+                        val nv = File(args[2], "scanned_dependencies_requirements_without_version.txt").printWriter()
 
                         dependenciesDag.forEach {
                             v.println(it.name + cleanedDependencies[it.name]!!.getLatestVersion().let { c ->
@@ -152,6 +150,60 @@ object Main {
 
                         v.close()
                         nv.close()
+                    }
+                }
+            }
+            (args.size == 3 || args.size == 4) && (args[0] == "check-package") -> {
+                // project root
+                val projectRoot = args[1]
+
+                // commit time of current commit
+                // if no commit time is given, use current time
+                val headTime = getProjectHeadTime(projectRoot)
+
+                val packageName = args[2]
+                val newDependency = runBlocking {
+                    findInPypi(packageName)
+                }
+
+                var selectedVersion: PyPIResult? = null
+                var dependency: PyPIResult? = null
+                if (newDependency.isSuccess) {
+                    dependency = newDependency.getOrThrow()
+                    selectedVersion = dependency.getAcceptableVersion(releaseBefore = headTime)
+                } else {
+                    println("Failed to find $packageName in pypi: ${newDependency.exceptionOrNull()}")
+                }
+
+                val latestVersion = selectedVersion?.getLatestVersion() ?: Result.failure(Exception("No version found"))
+                if (selectedVersion != null && latestVersion.isSuccess) {
+                    println("Selected version: ${latestVersion.getOrThrow().first}")
+                } else {
+                    println("No version found")
+                }
+
+                if (args.size == 3) {
+                    if (selectedVersion != null) {
+                        File(args[2], "suggest_dependency.json").printWriter().use { c ->
+                            jsonMapper.writeValue(c, mapOf(
+                                "name" to packageName,
+                                "meta" to dependency,
+                                "selectedVersion" to selectedVersion,
+                                "latestVersion" to latestVersion.getOrNull()?.first
+                            ))
+                        }
+
+                        File(args[2], "suggest_dependency_with_version.txt").printWriter().use { c ->
+                            if ( latestVersion.isSuccess) {
+                                c.println("$packageName<=${latestVersion.getOrThrow().first}")
+                            } else {
+                                c.println(packageName)
+                            }
+                        }
+
+                        File(args[2], "suggest_dependency_without_version.txt").printWriter().use { c ->
+                            c.println(packageName)
+                        }
                     }
                 }
             }

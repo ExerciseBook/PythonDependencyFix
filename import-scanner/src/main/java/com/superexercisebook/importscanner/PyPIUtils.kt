@@ -6,7 +6,6 @@ import io.ktor.client.features.json.*
 import io.ktor.client.request.*
 
 object PyPIUtils {
-
     val httpClient = HttpClient(CIO) {
         install(JsonFeature) {
             serializer = JacksonSerializer(jsonMapper)
