@@ -114,6 +114,11 @@ fun Map<String, PyPIResult>.toDag(): List<DagNode> {
         if (cython != null) {
             ret.add(0, cython)
         }
+
+        val numpy = dagPool.values.firstOrNull { it.name.equals("numpy", ignoreCase = true) }
+        if (numpy != null) {
+            ret.add(0, numpy)
+        }
     }
 
     return ret
@@ -148,6 +153,7 @@ fun PyPIResult.getDependenciesSet(): Set<String> {
     // https://github.com/apache/arrow/blob/master/python/setup.py#L40
     if (this.info.name.equals("pyarrow", ignoreCase = true)) {
         ret.add("Cython")
+        ret.add("numpy")
     }
 
     return ret
