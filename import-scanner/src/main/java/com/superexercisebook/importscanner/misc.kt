@@ -107,7 +107,16 @@ fun Map<String, PyPIResult>.toDag(): List<DagNode> {
         }
     }
 
-    return dagPool.filter { it.value.precursorCount == 0 }.map { it.value }.toList()
+    val ret =  dagPool.filter { it.value.precursorCount == 0 }.map { it.value }.toMutableList()
+    
+    if (ret.any { it.name.equals("pyarrow", ignoreCase = true) }) {
+        val cython = dagPool.values.firstOrNull { it.name.equals("cython", ignoreCase = true) }
+        if (cython != null) {
+            ret.add(0, cython)
+        }
+    }
+
+    return ret
 }
 
 /**
