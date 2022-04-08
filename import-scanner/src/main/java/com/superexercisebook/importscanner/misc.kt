@@ -132,9 +132,17 @@ fun PyPIResult.getLatestVersion(): Result<Pair<String, List<PyPIResultRelease>>>
 /**
  * Get dependencies of a package. Filtering out the conditional dependencies.
  */
-fun PyPIResult.getDependenciesSet() =
-    (this.info.requiresDist ?: listOf()).filter { !it.contains(";") }
-        .map { it.split(" ").first() }.toSet()
+fun PyPIResult.getDependenciesSet(): Set<String> {
+    val ret = (this.info.requiresDist ?: listOf()).filter { !it.contains(";") }
+        .map { it.split(" ").first() }.toMutableSet()
+
+    // https://github.com/apache/arrow/blob/master/python/setup.py#L40
+    if (this.info.name.equals("pyarrow", ignoreCase = true)) {
+        ret.add("Cython")
+    }
+
+    return ret
+}
 
 /**
  * Write the dag.
