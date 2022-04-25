@@ -14,7 +14,8 @@ object PythonProjectWalker {
         scanDirectory(File(s), File(s), notResolvedImport)
 
     fun scanDirectory(s: File, projectDirectory: File = File("."), notResolvedImport: (Set<String>) -> Unit = {}) {
-        s.walk().forEach {
+        s.list()?.forEach { path ->
+            val it = File(s, path)
             if (s == it) return@forEach
 
             if (it.isFile && it.extension == "py") {
