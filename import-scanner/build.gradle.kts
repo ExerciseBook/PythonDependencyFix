@@ -42,6 +42,8 @@ dependencies {
 
     implementation("org.eclipse.jgit:org.eclipse.jgit:6.1.0.202203080745-r")
     implementation("io.github.g00fy2:versioncompare:1.5.0")
+
+    implementation("commons-cli:commons-cli:1.5.0")
 }
 
 tasks.getByName<Test>("test") {
@@ -69,6 +71,7 @@ tasks.withType<ShadowJar> {
         include { it.moduleGroup.startsWith("com.fasterxml") }
         include { it.moduleGroup.startsWith("org.eclipse") }
         include { it.moduleGroup.startsWith("io.github") }
+        include { it.moduleGroup.equals("commons-cli", ignoreCase = true) }
     }
 }
 

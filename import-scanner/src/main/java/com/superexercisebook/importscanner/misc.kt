@@ -6,14 +6,17 @@ import java.time.LocalDateTime
 /**
  * Check package is acceptable or not
  */
-fun PyPIResult.isAcceptable(): Result<Unit> {
+fun PyPIResult.isAcceptable(
+    pythonVersion: String,
+    releaseBefore: LocalDateTime,
+): Result<Unit> {
     val latestVersion = this.info.version
 
     val latestRelease = this.releases[latestVersion]
         ?: return Result.failure(IllegalStateException("No release found for package ${this.info.name} version $latestVersion"))
 
     latestRelease.forEach { release ->
-        if (release.isAcceptable().isSuccess) {
+        if (release.isAcceptable(pythonVersion, releaseBefore).isSuccess) {
             return Result.success(Unit)
         }
     }
@@ -32,22 +35,42 @@ fun PyPIResult.isAcceptable(): Result<Unit> {
 /**
  * Check release (version) is acceptable or not
  */
-fun PyPIResultRelease.isAcceptable(releaseBefore: LocalDateTime = LocalDateTime.now()): Result<Unit> {
-    val pythonVersion = this.pythonVersion
+fun PyPIResultRelease.isAcceptable(
+    constrainPythonVersionStr: String,
+    releaseBefore: LocalDateTime,
+): Result<Unit> {
+    val constrainPythonVersionStep = Version(constrainPythonVersionStr)
+
+    val constrainPythonVersion = constrainPythonVersionStep.let { "${it.major}.${it.minor}" }
+    val constrainPythonVersionNoDots = constrainPythonVersionStep.let { "${it.major}${it.minor}" }
+    val constrainPythonVersionMajorVersion = constrainPythonVersionStep.let { "${it.major}" }
+
+    val acceptableVersion = listOf(
+        constrainPythonVersion,
+        constrainPythonVersionNoDots,
+        constrainPythonVersionMajorVersion,
+        "py$constrainPythonVersion",
+        "py$constrainPythonVersionNoDots",
+        "py$constrainPythonVersionMajorVersion",
+        "cp$constrainPythonVersion",
+        "cp$constrainPythonVersionNoDots",
+        "cp$constrainPythonVersionMajorVersion",
+        "source",
+    )
+
+    val packagePythonVersion = this.pythonVersion
     if (this.uploadTime > releaseBefore) {
         return Result.failure(IllegalStateException())
     }
-    if (pythonVersion != null) {
-        if (this.uploadTime < LocalDateTime.of(2019, 1, 1, 0, 0, 0)) {
+    if (packagePythonVersion != null) {
+        if (this.uploadTime < LocalDateTime.of(2017, 1, 1, 0, 0, 0)) {
             return Result.failure(IllegalStateException())
         }
 
-        if (pythonVersion.startsWith("3") ||
-            pythonVersion.contains("py3", ignoreCase = true) ||
-            pythonVersion.contains("cp3", ignoreCase = true) ||
-            pythonVersion.equals("source", ignoreCase = true)
-        ) {
-            return Result.success(Unit)
+        packagePythonVersion.split(".").forEach { version ->
+            if (acceptableVersion.any { it.equals(version, ignoreCase = true) }) {
+                return Result.success(Unit)
+            }
         }
     }
     return Result.failure(IllegalStateException())
@@ -56,17 +79,17 @@ fun PyPIResultRelease.isAcceptable(releaseBefore: LocalDateTime = LocalDateTime.
 /**
  * Get acceptable version of package
  */
-fun Map<String, PyPIResult>.getAcceptableVersion(releaseBefore: LocalDateTime = LocalDateTime.now()): Map<String, PyPIResult> {
+fun Map<String, PyPIResult>.getAcceptableVersion(pythonVersion: String, releaseBefore: LocalDateTime): Map<String, PyPIResult> {
     val ret = mutableMapOf<String, PyPIResult>()
 
     for ((name, pypiMeta) in this) {
-        ret[name] = pypiMeta.getAcceptableVersion(releaseBefore)
+        ret[name] = pypiMeta.getAcceptableVersion(pythonVersion, releaseBefore)
     }
 
     return ret
 }
 
-fun PyPIResult.getAcceptableVersion(releaseBefore: LocalDateTime): PyPIResult =
+fun PyPIResult.getAcceptableVersion(pythonVersion: String, releaseBefore: LocalDateTime): PyPIResult =
     PyPIResult(this.info, mutableMapOf<String, List<PyPIResultRelease>>().also { releaseMap ->
         for ((pypiVersion, pypiReleases) in this.releases) {
             if (pypiReleases.isEmpty()) {
@@ -75,7 +98,9 @@ fun PyPIResult.getAcceptableVersion(releaseBefore: LocalDateTime): PyPIResult =
 
             mutableListOf<PyPIResultRelease>().also { releaseList ->
                 for (pypiReleaseItem in pypiReleases) {
-                    if (pypiReleaseItem.isAcceptable(releaseBefore = releaseBefore).isSuccess) {
+                    if (pypiReleaseItem.isAcceptable(constrainPythonVersionStr = pythonVersion,
+                            releaseBefore = releaseBefore).isSuccess
+                    ) {
                         releaseList.add(pypiReleaseItem)
                     }
                 }
@@ -107,17 +132,17 @@ fun Map<String, PyPIResult>.toDag(): List<DagNode> {
         }
     }
 
-    val ret =  dagPool.filter { it.value.precursorCount == 0 }.map { it.value }.toMutableList()
-    
-    if (ret.any { it.name.equals("pyarrow", ignoreCase = true) }) {
-        val cython = dagPool.values.firstOrNull { it.name.equals("cython", ignoreCase = true) }
-        if (cython != null) {
-            ret.add(0, cython)
-        }
+    val ret = dagPool.filter { it.value.precursorCount == 0 }.map { it.value }.toMutableList()
 
+    if (ret.any { it.name.equals("pyarrow", ignoreCase = true) }) {
         val numpy = dagPool.values.firstOrNull { it.name.equals("numpy", ignoreCase = true) }
         if (numpy != null) {
             ret.add(0, numpy)
+        }
+
+        val cython = dagPool.values.firstOrNull { it.name.equals("cython", ignoreCase = true) }
+        if (cython != null) {
+            ret.add(0, cython)
         }
     }
 
