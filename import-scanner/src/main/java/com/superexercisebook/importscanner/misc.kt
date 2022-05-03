@@ -142,15 +142,22 @@ fun Map<String, PyPIResult>.toDag(): List<DagNode> {
         }
     }
 
-    val ret = dagPool.filter { it.value.precursorCount == 0 }.map { it.value }.toMutableList()
+    return dagPool.filter { it.value.precursorCount == 0 }.map { it.value }.toMutableList()
+}
 
-    if (ret.any { it.name.equals("pyarrow", ignoreCase = true) }) {
-        val numpy = dagPool.values.firstOrNull { it.name.equals("numpy", ignoreCase = true) }
+
+fun Map<String, PyPIResult>.getBuildTimeDependencies(): List<PyPIResult> {
+    val ret = mutableListOf<PyPIResult>()
+
+    if (this.any { it.value.info.name.equals("pyarrow", ignoreCase = true) }) {
+        val numpy = this["numpy"]
         if (numpy != null) {
             ret.add(0, numpy)
         }
+    }
 
-        val cython = dagPool.values.firstOrNull { it.name.equals("cython", ignoreCase = true) }
+    if (this.any { it.value.info.name.equals("numpy", ignoreCase = true) }) {
+        val cython = this["Cython"]
         if (cython != null) {
             ret.add(0, cython)
         }

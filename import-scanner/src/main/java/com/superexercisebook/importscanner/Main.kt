@@ -155,6 +155,9 @@ object Main {
         val dependenciesDag = cleanedDependencies.toDag()
         println("Dependencies DAG: \r\n${dependenciesDag.print()}")
 
+        val buildTimeDependencies = cleanedDependencies.getBuildTimeDependencies()
+        println("Build time dependencies: ${buildTimeDependencies.map { it.info.name }}")
+
         println("Clean dependencies: ${
             cleanedDependencies.map {
                 val c = it.value.getLatestVersion()
@@ -174,6 +177,22 @@ object Main {
 
         File(outputDirection, "scanned_dependencies_version.json").printWriter().use { c ->
             jsonMapper.writeValue(c, cleanedDependencies)
+        }
+
+        File(outputDirection, "scanned_build_time_dependencies.json").printWriter().use { c ->
+            jsonMapper.writeValue(c, buildTimeDependencies)
+        }
+
+        File(outputDirection, "scanned_build_time_dependencies.txt").printWriter().use { c ->
+            buildTimeDependencies.forEach {
+                c.println(it.info.name + it.getLatestVersion().let { p ->
+                    if (p.isSuccess) {
+                        "<=" + p.getOrThrow().first
+                    } else {
+                        ""
+                    }
+                })
+            }
         }
 
         run {
