@@ -16,7 +16,7 @@ fun PyPIResult.isAcceptable(
         ?: return Result.failure(IllegalStateException("No release found for package ${this.info.name} version $latestVersion"))
 
     latestRelease.forEach { release ->
-        if (release.isAcceptable(pythonVersion, releaseBefore).isSuccess) {
+        if (release.isAcceptable(pythonVersion, LocalDateTime.now()).isSuccess) {
             return Result.success(Unit)
         }
     }
@@ -102,6 +102,16 @@ fun PyPIResult.getAcceptableVersion(pythonVersion: String, releaseBefore: LocalD
                             releaseBefore = releaseBefore).isSuccess
                     ) {
                         releaseList.add(pypiReleaseItem)
+                    }
+                }
+            }.also { releaseList ->
+                if (releaseList.isEmpty()) {
+                    for (pypiReleaseItem in pypiReleases) {
+                        if (pypiReleaseItem.isAcceptable(constrainPythonVersionStr = pythonVersion,
+                                releaseBefore = LocalDateTime.now()).isSuccess
+                        ) {
+                            releaseList.add(pypiReleaseItem)
+                        }
                     }
                 }
             }.also {

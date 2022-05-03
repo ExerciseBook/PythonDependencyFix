@@ -29,14 +29,11 @@ object PyPIUtils {
         pypiPackageSpecification.getOrDefault(item, item).let {
             try {
                 val result: PyPIResult = httpClient.get("https://pypi.org/pypi/$it/json")
-                val acceptable = result.getAcceptableVersion(
-                    pythonVersion = pythonVersion,
-                    releaseBefore = releaseBefore,
-                )
-                if (acceptable.releases.isNotEmpty()) {
+                val acceptable = result.isAcceptable(pythonVersion, releaseBefore)
+                if (acceptable.isSuccess) {
                     Result.success(result)
                 } else {
-                    Result.failure(Exception())
+                    Result.failure(acceptable.exceptionOrNull()!!)
                 }
             } catch (e: Exception) {
                 Result.failure(e)
