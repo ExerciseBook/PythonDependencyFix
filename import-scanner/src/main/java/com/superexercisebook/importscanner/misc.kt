@@ -2,6 +2,7 @@ package com.superexercisebook.importscanner
 
 import io.github.g00fy2.versioncompare.Version
 import java.time.LocalDateTime
+import java.util.*
 
 /**
  * Check package is acceptable or not
@@ -32,35 +33,51 @@ fun PyPIResult.isAcceptable(
     )
 }
 
+enum class AcceptableState {
+    PYTHON_VERSION_COMPATIBLE_MAJOR,
+    PYTHON_VERSION_COMPATIBLE_MINOR,
+    PYTHON_SOURCE,
+    RELEASE_BEFORE_CONSTRAINT,
+}
+
 /**
  * Check release (version) is acceptable or not
  */
 fun PyPIResultRelease.isAcceptable(
     constrainPythonVersionStr: String,
     releaseBefore: LocalDateTime,
-): Result<Unit> {
+): Result<EnumSet<AcceptableState>> {
     val constrainPythonVersionStep = Version(constrainPythonVersionStr)
 
     val constrainPythonVersion = constrainPythonVersionStep.let { "${it.major}.${it.minor}" }
     val constrainPythonVersionNoDots = constrainPythonVersionStep.let { "${it.major}${it.minor}" }
     val constrainPythonVersionMajorVersion = constrainPythonVersionStep.let { "${it.major}" }
 
-    val acceptableVersion = listOf(
-        constrainPythonVersion,
-        constrainPythonVersionNoDots,
+    val acceptableVersionMajor = listOf(
         constrainPythonVersionMajorVersion,
-        "py$constrainPythonVersion",
-        "py$constrainPythonVersionNoDots",
         "py$constrainPythonVersionMajorVersion",
-        "cp$constrainPythonVersion",
-        "cp$constrainPythonVersionNoDots",
         "cp$constrainPythonVersionMajorVersion",
         "source",
     )
 
+    val acceptableVersionMinor = listOf(
+        constrainPythonVersion,
+        constrainPythonVersionNoDots,
+        "py$constrainPythonVersion",
+        "py$constrainPythonVersionNoDots",
+        "cp$constrainPythonVersion",
+        "cp$constrainPythonVersionNoDots",
+    )
+
+    val acceptableVersionSourceRelease = listOf(
+        "source",
+    )
+
+    val ret = EnumSet.noneOf(AcceptableState::class.java)
+
     val packagePythonVersion = this.pythonVersion
-    if (this.uploadTime > releaseBefore) {
-        return Result.failure(IllegalStateException())
+    if (this.uploadTime < releaseBefore) {
+        ret.add(AcceptableState.RELEASE_BEFORE_CONSTRAINT)
     }
     if (packagePythonVersion != null) {
         if (this.uploadTime < LocalDateTime.of(2017, 1, 1, 0, 0, 0)) {
@@ -68,11 +85,24 @@ fun PyPIResultRelease.isAcceptable(
         }
 
         packagePythonVersion.split(".").forEach { version ->
-            if (acceptableVersion.any { it.equals(version, ignoreCase = true) }) {
-                return Result.success(Unit)
+            if (acceptableVersionMajor.any { it.equals(version, ignoreCase = true) }) {
+                ret.add(AcceptableState.PYTHON_VERSION_COMPATIBLE_MAJOR)
+            }
+
+            if (acceptableVersionMinor.any { it.equals(version, ignoreCase = true) }) {
+                ret.add(AcceptableState.PYTHON_VERSION_COMPATIBLE_MINOR)
+            }
+
+            if (acceptableVersionSourceRelease.any { it.equals(version, ignoreCase = true) }) {
+                ret.add(AcceptableState.PYTHON_SOURCE)
             }
         }
     }
+
+    if (ret.isNotEmpty()) {
+        return Result.success(ret)
+    }
+
     return Result.failure(IllegalStateException())
 }
 
@@ -97,23 +127,36 @@ fun PyPIResult.getAcceptableVersion(pythonVersion: String, releaseBefore: LocalD
             }
 
             mutableListOf<PyPIResultRelease>().also { releaseList ->
+                val ret = mutableListOf<Pair<PyPIResultRelease, EnumSet<AcceptableState>>>()
+
                 for (pypiReleaseItem in pypiReleases) {
-                    if (pypiReleaseItem.isAcceptable(constrainPythonVersionStr = pythonVersion,
-                            releaseBefore = releaseBefore).isSuccess
-                    ) {
-                        releaseList.add(pypiReleaseItem)
+                    val t = pypiReleaseItem.isAcceptable(constrainPythonVersionStr = pythonVersion,
+                            releaseBefore = releaseBefore)
+                    if (t.isSuccess) {
+                        ret.add(pypiReleaseItem to t.getOrNull()!!)
                     }
                 }
-            }.also { releaseList ->
-                if (releaseList.isEmpty()) {
-                    for (pypiReleaseItem in pypiReleases) {
-                        if (pypiReleaseItem.isAcceptable(constrainPythonVersionStr = pythonVersion,
-                                releaseBefore = LocalDateTime.now()).isSuccess
-                        ) {
-                            releaseList.add(pypiReleaseItem)
-                        }
+
+                ret.sortWith { a, b ->
+                    if (a.second.contains(AcceptableState.PYTHON_VERSION_COMPATIBLE_MINOR) && !b.second.contains(AcceptableState.PYTHON_VERSION_COMPATIBLE_MINOR)) {
+                        -1
+                    } else if (!a.second.contains(AcceptableState.PYTHON_VERSION_COMPATIBLE_MINOR) && b.second.contains(AcceptableState.PYTHON_VERSION_COMPATIBLE_MINOR)) {
+                        1
+                    } else if (a.second.contains(AcceptableState.PYTHON_VERSION_COMPATIBLE_MINOR) && b.second.contains(AcceptableState.PYTHON_VERSION_COMPATIBLE_MINOR)) {
+                        a.first.uploadTime.compareTo(b.first.uploadTime)
+                    } else
+                    if (a.second.contains(AcceptableState.PYTHON_VERSION_COMPATIBLE_MAJOR) && !b.second.contains(AcceptableState.PYTHON_VERSION_COMPATIBLE_MAJOR)) {
+                        -1
+                    } else if (!a.second.contains(AcceptableState.PYTHON_VERSION_COMPATIBLE_MAJOR) && b.second.contains(AcceptableState.PYTHON_VERSION_COMPATIBLE_MAJOR)) {
+                        1
+                    } else if (a.second.contains(AcceptableState.PYTHON_VERSION_COMPATIBLE_MAJOR) && b.second.contains(AcceptableState.PYTHON_VERSION_COMPATIBLE_MAJOR)) {
+                        a.first.uploadTime.compareTo(b.first.uploadTime)
+                    } else  {
+                        a.first.uploadTime.compareTo(b.first.uploadTime)
                     }
-                }
+                 }
+
+                releaseList.addAll(ret.map { it.first }.toMutableList())
             }.also {
                 if (it.isNotEmpty()) {
                     releaseMap[pypiVersion] = it
